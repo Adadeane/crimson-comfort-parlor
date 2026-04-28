@@ -127,16 +127,20 @@ function Index() {
       const p = Math.max(0, Math.min(1, window.scrollY / h));
       const t = ctx.currentTime;
 
-      // Corruption curve: stays ~0 until 60%, then ramps up sharply
+      // Subtle early unease: starts ~"You are not your skin" (≈35%), caps low
+      const unease = Math.min(1, Math.max(0, (p - 0.33) / 0.25));
+      // Main corruption curve: stays ~0 until 60%, then ramps up sharply
       const corrupt = Math.pow(Math.max(0, (p - 0.6) / 0.4), 1.4);
+      // Combined distortion amount — small wobble first, full chaos later
+      const distAmt = Math.max(unease * 0.18, corrupt);
 
-      // Distortion mix — only in final 40%
-      shaper.curve = makeCurve(corrupt);
-      wetGain.gain.linearRampToValueAtTime(corrupt, t + 0.1);
-      dryGain.gain.linearRampToValueAtTime(1 - corrupt * 0.5, t + 0.1);
+      // Distortion mix — gentle hint early, heavy late
+      shaper.curve = makeCurve(distAmt);
+      wetGain.gain.linearRampToValueAtTime(distAmt, t + 0.1);
+      dryGain.gain.linearRampToValueAtTime(1 - distAmt * 0.5, t + 0.1);
 
-      // Tone stays bright until late, then darkens
-      tone.frequency.linearRampToValueAtTime(8000 - corrupt * 7300, t + 0.1);
+      // Tone slightly muffles early, fully darkens late
+      tone.frequency.linearRampToValueAtTime(8000 - unease * 1500 - corrupt * 5800, t + 0.1);
       tone.Q.linearRampToValueAtTime(1 + corrupt * 8, t + 0.1);
 
       // Drones swell only in last third
