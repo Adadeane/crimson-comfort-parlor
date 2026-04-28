@@ -127,50 +127,50 @@ function Index() {
       const p = Math.max(0, Math.min(1, window.scrollY / h));
       const t = ctx.currentTime;
 
-      // Distortion mix
-      shaper.curve = makeCurve(Math.pow(p, 1.5));
-      wetGain.gain.linearRampToValueAtTime(Math.pow(p, 1.3), t + 0.1);
-      dryGain.gain.linearRampToValueAtTime(1 - p * 0.5, t + 0.1);
+      // Corruption curve: stays ~0 until 60%, then ramps up sharply
+      const corrupt = Math.pow(Math.max(0, (p - 0.6) / 0.4), 1.4);
 
-      // Tone darkens with descent
-      tone.frequency.linearRampToValueAtTime(8000 - p * 7300, t + 0.1);
-      tone.Q.linearRampToValueAtTime(1 + p * 8, t + 0.1);
+      // Distortion mix — only in final 40%
+      shaper.curve = makeCurve(corrupt);
+      wetGain.gain.linearRampToValueAtTime(corrupt, t + 0.1);
+      dryGain.gain.linearRampToValueAtTime(1 - corrupt * 0.5, t + 0.1);
 
-      // Drones swell in second half
-      const droneAmt = Math.max(0, (p - 0.4) / 0.6);
+      // Tone stays bright until late, then darkens
+      tone.frequency.linearRampToValueAtTime(8000 - corrupt * 7300, t + 0.1);
+      tone.Q.linearRampToValueAtTime(1 + corrupt * 8, t + 0.1);
+
+      // Drones swell only in last third
+      const droneAmt = Math.max(0, (p - 0.65) / 0.35);
       droneGain.gain.linearRampToValueAtTime(Math.pow(droneAmt, 1.4) * 0.45, t + 0.15);
       droneFilter.frequency.linearRampToValueAtTime(180 + droneAmt * 600, t + 0.15);
 
-      // Whine in deep horror
-      whineGain.gain.linearRampToValueAtTime(p > 0.75 ? (p - 0.75) * 0.18 : 0, t + 0.1);
-      whine.detune.value = Math.sin(t * 4) * p * 50;
+      // Whine only in deep horror
+      whineGain.gain.linearRampToValueAtTime(p > 0.85 ? (p - 0.85) * 0.25 : 0, t + 0.1);
+      whine.detune.value = Math.sin(t * 4) * corrupt * 50;
 
-      // Melody scheduling: tempo slows + notes get more random as horror grows
+      // Melody scheduling: tempo stays cute until late
       const baseInterval = 0.42; // cute tempo
-      const interval = baseInterval + p * 1.2;
+      const interval = baseInterval + corrupt * 1.4;
       if (t - lastNoteAt > interval) {
-        // Pick next note: sequential when cute, random + occasional minor/dissonant when scary
         let freq: number;
-        if (p < 0.5) {
+        if (p < 0.7) {
           freq = scale[melodyStep % scale.length];
           melodyStep++;
         } else {
-          // Drift to scary: pick random scale notes plus dissonant intervals
-          if (Math.random() < p * 0.7) {
+          if (Math.random() < corrupt * 0.8) {
             freq = scale[Math.floor(Math.random() * scale.length)] * (Math.random() < 0.4 ? 0.5 : 1);
-            // Add a tritone shimmer
-            if (Math.random() < p * 0.5) freq *= 1.414;
+            if (Math.random() < corrupt * 0.6) freq *= 1.414;
           } else {
             freq = scale[melodyStep % scale.length];
             melodyStep++;
           }
         }
-        playNote(freq, t + 0.02, p);
+        playNote(freq, t + 0.02, corrupt);
         lastNoteAt = t;
       }
 
-      // Heartbeat thumps in deep horror
-      if (p > 0.55 && Math.random() < 0.015 + p * 0.04) {
+      // Heartbeat thumps only deep in horror
+      if (p > 0.75 && Math.random() < 0.01 + corrupt * 0.05) {
         const thump = ctx.createOscillator();
         const tg = ctx.createGain();
         thump.frequency.value = 55;
