@@ -295,6 +295,59 @@ function Index() {
         </div>
       </section>
 
+      {/* SECTION 3.5 — OUR PHILOSOPHY (still cozy, faintly off) */}
+      <section className="min-h-screen flex flex-col items-center justify-center px-6 py-24">
+        <p className="tracking-[0.4em] text-xs uppercase mb-6 opacity-70" style={{ color: "#a8745a" }}>our philosophy</p>
+        <h2 style={{ fontFamily: "var(--font-display)" }} className="text-5xl md:text-6xl italic text-center max-w-3xl mb-10">
+          You are not your skin.
+        </h2>
+        <div className="max-w-2xl space-y-6 text-lg leading-relaxed text-center" style={{ color: "#5a3322" }}>
+          <p>For over a century, Petal &amp; Peel has helped clients shed the layer that no longer serves them.</p>
+          <p>What remains underneath is softer. Pinker. More <em>honest</em>.</p>
+          <p className="opacity-70 text-base">The discarded layer is composted in our garden. The roses do beautifully.</p>
+        </div>
+      </section>
+
+      {/* SECTION 3.7 — THE RITUAL STEPS (cozy → unsettling) */}
+      <section className="min-h-screen flex flex-col items-center justify-center px-6 py-24">
+        <h2 style={{ fontFamily: "var(--font-display)" }} className="text-5xl italic text-center mb-16">A Ritual in Five Movements</h2>
+        <ol className="max-w-xl w-full space-y-8">
+          {[
+            { n: "I", title: "Welcome Tea", desc: "Chamomile, honey, a whisper of valerian. You will feel safe." },
+            { n: "II", title: "Disrobing", desc: "Soft lighting. Folded linens. We do not watch." },
+            { n: "III", title: "The First Touch", desc: "Warm oil along the spine. Your shoulders forget themselves." },
+            { n: "IV", title: "The Loosening", desc: "Where the skin meets the meat, we listen. We wait. It lets go." },
+            { n: "V", title: "Renewal", desc: "You will not remember leaving. You will return next month. You will." },
+          ].map((s) => (
+            <li key={s.n} className="flex gap-6 items-start">
+              <span style={{ fontFamily: "var(--font-display)", color: "#a8745a" }} className="text-3xl italic shrink-0">{s.n}.</span>
+              <div>
+                <h3 style={{ fontFamily: "var(--font-display)", color: "#5a3322" }} className="text-xl italic mb-1">{s.title}</h3>
+                <p className="text-sm opacity-80" style={{ color: "#5a3322" }}>{s.desc}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* SECTION 3.9 — FAQ (subtle dread building) */}
+      <section className="min-h-screen flex flex-col items-center justify-center px-6 py-24">
+        <h2 style={{ fontFamily: "var(--font-display)" }} className="text-5xl italic text-center mb-12">Gentle Questions</h2>
+        <div className="max-w-2xl w-full space-y-6">
+          {[
+            { q: "Will it hurt?", a: "Only at first. Then never again." },
+            { q: "Can I bring a friend?", a: "We prefer you come alone. They understand. They always understand." },
+            { q: "Is parking available?", a: "Yes — three spots behind the building. The fourth car never leaves." },
+            { q: "Do you accept walk-ins?", a: "We knew you were coming. Your room is ready." },
+          ].map((f, i) => (
+            <div key={i} className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.4)", border: "1px solid rgba(168,116,90,0.15)" }}>
+              <h3 style={{ fontFamily: "var(--font-display)", color: "#5a3322" }} className="text-xl italic mb-2">{f.q}</h3>
+              <p className="text-sm opacity-80" style={{ color: "#5a3322" }}>{f.a}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* SECTION 4 — TRANSITION (red bleeding in) */}
       <section className="min-h-screen flex flex-col items-center justify-center px-6 py-24 relative">
         {/* Drips */}
