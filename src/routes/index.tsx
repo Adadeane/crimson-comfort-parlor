@@ -34,65 +34,165 @@ function Index() {
     audioRef.current = ctx;
 
     const master = ctx.createGain();
-    master.gain.value = 0;
+    master.gain.value = 0.5;
     master.connect(ctx.destination);
 
-    // Low drone
+    // ---- Distortion node (dry at top, wet at bottom) ----
+    const makeCurve = (amount: number) => {
+      const n = 1024;
+      const curve = new Float32Array(n);
+      const k = amount * 100;
+      for (let i = 0; i < n; i++) {
+        const x = (i * 2) / n - 1;
+        curve[i] = ((3 + k) * x * 20 * (Math.PI / 180)) / (Math.PI + k * Math.abs(x));
+      }
+      return curve;
+    };
+    const shaper = ctx.createWaveShaper();
+    shaper.curve = makeCurve(0);
+    shaper.oversample = "4x";
+
+    // Lowpass that closes as horror grows (muffles the cute melody → underwater dread)
+    const tone = ctx.createBiquadFilter();
+    tone.type = "lowpass";
+    tone.frequency.value = 8000;
+    tone.Q.value = 1;
+
+    // Pitch shifter via playbackRate isn't available on osc; we'll detune live instead.
+    // Wet/dry mix for distortion
+    const dryGain = ctx.createGain(); dryGain.gain.value = 1;
+    const wetGain = ctx.createGain(); wetGain.gain.value = 0;
+
+    const busIn = ctx.createGain();
+    busIn.connect(dryGain).connect(tone).connect(master);
+    busIn.connect(shaper).connect(wetGain).connect(tone);
+
+    // ---- Cute melody: music-box-ish twinkle ----
+    // C major pentatonic ascending/descending lullaby
+    const scale = [523.25, 587.33, 659.25, 783.99, 880.00, 783.99, 659.25, 587.33];
+    const melodyOscs: OscillatorNode[] = [];
+    let melodyStep = 0;
+    let lastNoteAt = 0;
+
+    const playNote = (freq: number, when: number, p: number) => {
+      // Two-osc bell: sine fundamental + soft triangle harmonic
+      const o1 = ctx.createOscillator();
+      o1.type = "sine";
+      const o2 = ctx.createOscillator();
+      o2.type = "triangle";
+      const g = ctx.createGain();
+      // Pitch drops as horror grows
+      const pitchMul = 1 - p * 0.45;
+      o1.frequency.value = freq * pitchMul;
+      o2.frequency.value = freq * 2 * pitchMul;
+      // Detune wobble grows with horror
+      o1.detune.value = (Math.random() - 0.5) * p * 80;
+      o2.detune.value = (Math.random() - 0.5) * p * 120;
+      g.gain.setValueAtTime(0, when);
+      g.gain.linearRampToValueAtTime(0.18, when + 0.01);
+      // Sustain stretches as horror grows (notes smear together)
+      const decay = 0.6 + p * 2.5;
+      g.gain.exponentialRampToValueAtTime(0.001, when + decay);
+      o1.connect(g);
+      o2.connect(g);
+      g.connect(busIn);
+      o1.start(when); o2.start(when);
+      o1.stop(when + decay + 0.05);
+      o2.stop(when + decay + 0.05);
+      melodyOscs.push(o1, o2);
+    };
+
+    // ---- Drones (silent at top, loud at bottom) ----
     const drone = ctx.createOscillator();
-    drone.type = "sawtooth";
-    drone.frequency.value = 55;
-    const droneGain = ctx.createGain();
-    droneGain.gain.value = 0.15;
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 200;
-    drone.connect(filter).connect(droneGain).connect(master);
-    drone.start();
-
-    // Detuned second drone
+    drone.type = "sawtooth"; drone.frequency.value = 55;
     const drone2 = ctx.createOscillator();
-    drone2.type = "sawtooth";
-    drone2.frequency.value = 56.7;
-    drone2.connect(filter);
-    drone2.start();
+    drone2.type = "sawtooth"; drone2.frequency.value = 56.7;
+    const droneFilter = ctx.createBiquadFilter();
+    droneFilter.type = "lowpass"; droneFilter.frequency.value = 180;
+    const droneGain = ctx.createGain(); droneGain.gain.value = 0;
+    drone.connect(droneFilter); drone2.connect(droneFilter);
+    droneFilter.connect(droneGain).connect(master);
+    drone.start(); drone2.start();
 
-    // High dissonant whine
+    // ---- High dissonant whine (only deep horror) ----
     const whine = ctx.createOscillator();
-    whine.type = "sine";
-    whine.frequency.value = 1760;
-    const whineGain = ctx.createGain();
-    whineGain.gain.value = 0.02;
+    whine.type = "sine"; whine.frequency.value = 1760;
+    const whineGain = ctx.createGain(); whineGain.gain.value = 0;
     whine.connect(whineGain).connect(master);
     whine.start();
 
-    oscRefs.current = [
-      { stop: () => { drone.stop(); drone2.stop(); whine.stop(); ctx.close(); } },
-    ];
-
-    // Animation loop tied to scroll
     let raf = 0;
     const tick = () => {
       const h = document.documentElement.scrollHeight - window.innerHeight;
       const p = Math.max(0, Math.min(1, window.scrollY / h));
       const t = ctx.currentTime;
-      master.gain.linearRampToValueAtTime(Math.pow(p, 1.5) * 0.6, t + 0.1);
-      filter.frequency.linearRampToValueAtTime(150 + p * 800, t + 0.1);
-      whineGain.gain.linearRampToValueAtTime(p > 0.7 ? (p - 0.7) * 0.25 : 0, t + 0.1);
-      // Random heartbeat thumps in horror zone
-      if (p > 0.5 && Math.random() < 0.02 + p * 0.05) {
+
+      // Distortion mix
+      shaper.curve = makeCurve(Math.pow(p, 1.5));
+      wetGain.gain.linearRampToValueAtTime(Math.pow(p, 1.3), t + 0.1);
+      dryGain.gain.linearRampToValueAtTime(1 - p * 0.5, t + 0.1);
+
+      // Tone darkens with descent
+      tone.frequency.linearRampToValueAtTime(8000 - p * 7300, t + 0.1);
+      tone.Q.linearRampToValueAtTime(1 + p * 8, t + 0.1);
+
+      // Drones swell in second half
+      const droneAmt = Math.max(0, (p - 0.4) / 0.6);
+      droneGain.gain.linearRampToValueAtTime(Math.pow(droneAmt, 1.4) * 0.45, t + 0.15);
+      droneFilter.frequency.linearRampToValueAtTime(180 + droneAmt * 600, t + 0.15);
+
+      // Whine in deep horror
+      whineGain.gain.linearRampToValueAtTime(p > 0.75 ? (p - 0.75) * 0.18 : 0, t + 0.1);
+      whine.detune.value = Math.sin(t * 4) * p * 50;
+
+      // Melody scheduling: tempo slows + notes get more random as horror grows
+      const baseInterval = 0.42; // cute tempo
+      const interval = baseInterval + p * 1.2;
+      if (t - lastNoteAt > interval) {
+        // Pick next note: sequential when cute, random + occasional minor/dissonant when scary
+        let freq: number;
+        if (p < 0.5) {
+          freq = scale[melodyStep % scale.length];
+          melodyStep++;
+        } else {
+          // Drift to scary: pick random scale notes plus dissonant intervals
+          if (Math.random() < p * 0.7) {
+            freq = scale[Math.floor(Math.random() * scale.length)] * (Math.random() < 0.4 ? 0.5 : 1);
+            // Add a tritone shimmer
+            if (Math.random() < p * 0.5) freq *= 1.414;
+          } else {
+            freq = scale[melodyStep % scale.length];
+            melodyStep++;
+          }
+        }
+        playNote(freq, t + 0.02, p);
+        lastNoteAt = t;
+      }
+
+      // Heartbeat thumps in deep horror
+      if (p > 0.55 && Math.random() < 0.015 + p * 0.04) {
         const thump = ctx.createOscillator();
         const tg = ctx.createGain();
-        thump.frequency.value = 60;
+        thump.frequency.value = 55;
         thump.type = "sine";
-        tg.gain.setValueAtTime(0.4 * p, t);
-        tg.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+        tg.gain.setValueAtTime(0.45 * p, t);
+        tg.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
         thump.connect(tg).connect(master);
         thump.start(t);
-        thump.stop(t + 0.25);
+        thump.stop(t + 0.32);
       }
+
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
+
+    oscRefs.current = [{
+      stop: () => {
+        try { drone.stop(); drone2.stop(); whine.stop(); } catch { /* already stopped */ }
+        melodyOscs.forEach(o => { try { o.stop(); } catch { /* noop */ } });
+        ctx.close();
+      },
+    }];
 
     return () => {
       cancelAnimationFrame(raf);
