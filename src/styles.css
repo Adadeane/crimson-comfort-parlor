@@ -4,6 +4,41 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Cozy → Horror palette */
+@theme {
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+  --font-scary: "Creepster", "Fraunces", serif;
+}
+
+@keyframes flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+  20%, 24%, 55% { opacity: 0.4; }
+}
+@keyframes shake {
+  0%, 100% { transform: translate(0,0) rotate(0); }
+  25% { transform: translate(-3px, 2px) rotate(-0.5deg); }
+  50% { transform: translate(2px, -3px) rotate(0.5deg); }
+  75% { transform: translate(-2px, -2px) rotate(-0.3deg); }
+}
+@keyframes drip {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(0); }
+}
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(3deg); }
+}
+
+.animate-flicker { animation: flicker 4s infinite; }
+.animate-shake { animation: shake 0.15s infinite; }
+.animate-breathe { animation: breathe 6s ease-in-out infinite; }
+.animate-float-soft { animation: float-soft 8s ease-in-out infinite; }
+
 /*
  * Design system definition.
  *
