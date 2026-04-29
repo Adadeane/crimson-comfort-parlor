@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import spaCozy from "@/assets/spa-cozy.jpg";
 import handsMassage from "@/assets/hands-massage.jpg";
 import skinwalker from "@/assets/skinwalker.jpg";
@@ -17,27 +17,56 @@ function Index() {
   const audioRef = useRef<AudioContext | null>(null);
   const oscRefs = useRef<{ stop: () => void }[]>([]);
 
+  const ensureAudioContext = useCallback(() => {
+    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const current = audioRef.current;
+
+    if (current && current.state !== "closed") {
+      if (current.state === "suspended") current.resume().catch(() => {});
+      return current;
+    }
+
+    const ctx = new Ctx();
+    audioRef.current = ctx;
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    return ctx;
+  }, []);
+
   // Browsers block autoplay until the user interacts. Try to resume immediately;
   // if blocked, resume on the first user gesture so audio is effectively "on by default".
   useEffect(() => {
+    if (hasGesture) return;
+
     const onGesture = () => {
       setHasGesture(true);
+      if (audioOn) ensureAudioContext();
       window.removeEventListener("pointerdown", onGesture);
       window.removeEventListener("keydown", onGesture);
       window.removeEventListener("touchstart", onGesture);
-      window.removeEventListener("scroll", onGesture);
+      window.removeEventListener("wheel", onGesture);
     };
-    window.addEventListener("pointerdown", onGesture);
-    window.addEventListener("keydown", onGesture);
-    window.addEventListener("touchstart", onGesture);
-    window.addEventListener("scroll", onGesture, { passive: true });
+
+    window.addEventListener("pointerdown", onGesture, { once: true });
+    window.addEventListener("keydown", onGesture, { once: true });
+    window.addEventListener("touchstart", onGesture, { once: true, passive: true });
+    window.addEventListener("wheel", onGesture, { once: true, passive: true });
+
     return () => {
       window.removeEventListener("pointerdown", onGesture);
       window.removeEventListener("keydown", onGesture);
       window.removeEventListener("touchstart", onGesture);
-      window.removeEventListener("scroll", onGesture);
+      window.removeEventListener("wheel", onGesture);
     };
-  }, []);
+  }, [audioOn, ensureAudioContext, hasGesture]);
+
+  const handleAudioToggle = () => {
+    const next = !audioOn;
+    if (next) {
+      setHasGesture(true);
+      ensureAudioContext();
+    }
+    setAudioOn(next);
+  };
 
   useEffect(() => {
     const onScroll = () => {
@@ -52,10 +81,7 @@ function Index() {
   // Procedural horror audio that intensifies with scroll
   useEffect(() => {
     if (!audioOn || !hasGesture) return;
-    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ctx = new Ctx();
-    audioRef.current = ctx;
-    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    const ctx = ensureAudioContext();
 
     const master = ctx.createGain();
     master.gain.value = 0.5;
@@ -151,54 +177,54 @@ function Index() {
       const p = Math.max(0, Math.min(1, window.scrollY / h));
       const t = ctx.currentTime;
 
-      // Subtle early unease: aligned to "You are not your skin" section (~25%), grows slowly
-      const unease = Math.min(1, Math.max(0, (p - 0.22) / 0.3));
-      // Main corruption curve: stays ~0 until 70% (later, since page is longer), then ramps up
-      const corrupt = Math.pow(Math.max(0, (p - 0.7) / 0.3), 1.4);
-      // Combined distortion amount — small wobble first, full chaos later
-      const distAmt = Math.max(unease * 0.18, corrupt);
+      // Start getting wrong right as "You are not your skin" comes into view,
+      // then push the real corruption noticeably earlier.
+      const unease = Math.min(1, Math.max(0, (p - 0.28) / 0.16));
+      const corrupt = Math.pow(Math.max(0, (p - 0.58) / 0.24), 1.18);
+      const musicFear = Math.max(unease * 0.45, corrupt);
+      const distAmt = Math.min(1, Math.max(unease * 0.28, corrupt));
 
       // Distortion mix — gentle hint early, heavy late
       shaper.curve = makeCurve(distAmt);
       wetGain.gain.linearRampToValueAtTime(distAmt, t + 0.1);
       dryGain.gain.linearRampToValueAtTime(1 - distAmt * 0.5, t + 0.1);
 
-      // Tone slightly muffles early, fully darkens late
-      tone.frequency.linearRampToValueAtTime(8000 - unease * 1500 - corrupt * 5800, t + 0.1);
-      tone.Q.linearRampToValueAtTime(1 + corrupt * 8, t + 0.1);
+      // Tone starts souring earlier so the melody turns uncanny faster.
+      tone.frequency.linearRampToValueAtTime(8200 - unease * 2200 - corrupt * 5000, t + 0.1);
+      tone.Q.linearRampToValueAtTime(1 + musicFear * 10, t + 0.1);
 
-      // Drones swell only at the very end
-      const droneAmt = Math.max(0, (p - 0.75) / 0.25);
+      // Drones and other threats arrive sooner.
+      const droneAmt = Math.max(0, (p - 0.68) / 0.22);
       droneGain.gain.linearRampToValueAtTime(Math.pow(droneAmt, 1.4) * 0.45, t + 0.15);
       droneFilter.frequency.linearRampToValueAtTime(180 + droneAmt * 600, t + 0.15);
 
       // Whine only in deep horror
-      whineGain.gain.linearRampToValueAtTime(p > 0.88 ? (p - 0.88) * 0.3 : 0, t + 0.1);
+      whineGain.gain.linearRampToValueAtTime(p > 0.8 ? (p - 0.8) * 0.45 : 0, t + 0.1);
       whine.detune.value = Math.sin(t * 4) * corrupt * 50;
 
-      // Melody scheduling: tempo stays cute until late
+      // Melody scheduling: the tune starts slipping earlier.
       const baseInterval = 0.42; // cute tempo
-      const interval = baseInterval + corrupt * 1.4;
+      const interval = baseInterval + musicFear * 1.15;
       if (t - lastNoteAt > interval) {
         let freq: number;
-        if (p < 0.78) {
+        if (p < 0.62) {
           freq = scale[melodyStep % scale.length];
           melodyStep++;
         } else {
-          if (Math.random() < corrupt * 0.8) {
+          if (Math.random() < musicFear * 0.9) {
             freq = scale[Math.floor(Math.random() * scale.length)] * (Math.random() < 0.4 ? 0.5 : 1);
-            if (Math.random() < corrupt * 0.6) freq *= 1.414;
+            if (Math.random() < musicFear * 0.7) freq *= 1.414;
           } else {
             freq = scale[melodyStep % scale.length];
             melodyStep++;
           }
         }
-        playNote(freq, t + 0.02, corrupt);
+        playNote(freq, t + 0.02, musicFear);
         lastNoteAt = t;
       }
 
       // Heartbeat thumps only deep in horror
-      if (p > 0.82 && Math.random() < 0.01 + corrupt * 0.05) {
+      if (p > 0.74 && Math.random() < 0.01 + musicFear * 0.06) {
         const thump = ctx.createOscillator();
         const tg = ctx.createGain();
         thump.frequency.value = 55;
@@ -218,7 +244,8 @@ function Index() {
       stop: () => {
         try { drone.stop(); drone2.stop(); whine.stop(); } catch { /* already stopped */ }
         melodyOscs.forEach(o => { try { o.stop(); } catch { /* noop */ } });
-        ctx.close();
+        if (audioRef.current === ctx) audioRef.current = null;
+        if (ctx.state !== "closed") ctx.close().catch(() => {});
       },
     }];
 
@@ -226,7 +253,7 @@ function Index() {
       cancelAnimationFrame(raf);
       oscRefs.current.forEach(o => o.stop());
     };
-  }, [audioOn, hasGesture]);
+  }, [audioOn, ensureAudioContext, hasGesture]);
 
   // Color interpolation
   const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -249,7 +276,7 @@ function Index() {
     >
       {/* Audio toggle */}
       <button
-        onClick={() => setAudioOn(v => !v)}
+        onClick={handleAudioToggle}
         className="fixed top-4 right-4 z-50 px-4 py-2 rounded-full text-xs font-medium backdrop-blur-sm border"
         style={{
           background: progress > 0.5 ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.7)",
