@@ -226,7 +226,7 @@ function Index() {
       cancelAnimationFrame(raf);
       oscRefs.current.forEach(o => o.stop());
     };
-  }, [audioOn]);
+  }, [audioOn, hasGesture]);
 
   // Color interpolation
   const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
