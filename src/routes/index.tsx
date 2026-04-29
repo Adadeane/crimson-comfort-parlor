@@ -12,9 +12,32 @@ export const Route = createFileRoute("/")({
 // Scroll progress (0..1) drives color, type, and atmosphere.
 function Index() {
   const [progress, setProgress] = useState(0);
-  const [audioOn, setAudioOn] = useState(false);
+  const [audioOn, setAudioOn] = useState(true);
   const audioRef = useRef<AudioContext | null>(null);
   const oscRefs = useRef<{ stop: () => void }[]>([]);
+
+  // Browsers block autoplay until the user interacts. Try to resume immediately;
+  // if blocked, resume on the first user gesture so audio is effectively "on by default".
+  useEffect(() => {
+    const resume = () => {
+      const ctx = audioRef.current;
+      if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+    };
+    const onGesture = () => {
+      resume();
+      window.removeEventListener("pointerdown", onGesture);
+      window.removeEventListener("keydown", onGesture);
+      window.removeEventListener("scroll", onGesture);
+    };
+    window.addEventListener("pointerdown", onGesture, { once: false });
+    window.addEventListener("keydown", onGesture, { once: false });
+    window.addEventListener("scroll", onGesture, { once: false, passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", onGesture);
+      window.removeEventListener("keydown", onGesture);
+      window.removeEventListener("scroll", onGesture);
+    };
+  }, []);
 
   useEffect(() => {
     const onScroll = () => {
@@ -127,10 +150,10 @@ function Index() {
       const p = Math.max(0, Math.min(1, window.scrollY / h));
       const t = ctx.currentTime;
 
-      // Subtle early unease: starts ~"You are not your skin" (≈35%), caps low
-      const unease = Math.min(1, Math.max(0, (p - 0.33) / 0.25));
-      // Main corruption curve: stays ~0 until 60%, then ramps up sharply
-      const corrupt = Math.pow(Math.max(0, (p - 0.6) / 0.4), 1.4);
+      // Subtle early unease: aligned to "You are not your skin" section (~25%), grows slowly
+      const unease = Math.min(1, Math.max(0, (p - 0.22) / 0.3));
+      // Main corruption curve: stays ~0 until 70% (later, since page is longer), then ramps up
+      const corrupt = Math.pow(Math.max(0, (p - 0.7) / 0.3), 1.4);
       // Combined distortion amount — small wobble first, full chaos later
       const distAmt = Math.max(unease * 0.18, corrupt);
 
@@ -143,13 +166,13 @@ function Index() {
       tone.frequency.linearRampToValueAtTime(8000 - unease * 1500 - corrupt * 5800, t + 0.1);
       tone.Q.linearRampToValueAtTime(1 + corrupt * 8, t + 0.1);
 
-      // Drones swell only in last third
-      const droneAmt = Math.max(0, (p - 0.65) / 0.35);
+      // Drones swell only at the very end
+      const droneAmt = Math.max(0, (p - 0.75) / 0.25);
       droneGain.gain.linearRampToValueAtTime(Math.pow(droneAmt, 1.4) * 0.45, t + 0.15);
       droneFilter.frequency.linearRampToValueAtTime(180 + droneAmt * 600, t + 0.15);
 
       // Whine only in deep horror
-      whineGain.gain.linearRampToValueAtTime(p > 0.85 ? (p - 0.85) * 0.25 : 0, t + 0.1);
+      whineGain.gain.linearRampToValueAtTime(p > 0.88 ? (p - 0.88) * 0.3 : 0, t + 0.1);
       whine.detune.value = Math.sin(t * 4) * corrupt * 50;
 
       // Melody scheduling: tempo stays cute until late
@@ -157,7 +180,7 @@ function Index() {
       const interval = baseInterval + corrupt * 1.4;
       if (t - lastNoteAt > interval) {
         let freq: number;
-        if (p < 0.7) {
+        if (p < 0.78) {
           freq = scale[melodyStep % scale.length];
           melodyStep++;
         } else {
@@ -174,7 +197,7 @@ function Index() {
       }
 
       // Heartbeat thumps only deep in horror
-      if (p > 0.75 && Math.random() < 0.01 + corrupt * 0.05) {
+      if (p > 0.82 && Math.random() < 0.01 + corrupt * 0.05) {
         const thump = ctx.createOscillator();
         const tg = ctx.createGain();
         thump.frequency.value = 55;
@@ -349,6 +372,85 @@ function Index() {
               <p className="text-sm opacity-80" style={{ color: "#5a3322" }}>{f.a}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* SECTION 4 — TRANSITION (red bleeding in) */}
+      {/* SECTION 3.92 — STAFF (cozy, slightly off) */}
+      <section className="min-h-screen flex flex-col items-center justify-center px-6 py-24">
+        <p className="tracking-[0.4em] text-xs uppercase mb-6 opacity-70" style={{ color: "#a8745a" }}>your gentle hands</p>
+        <h2 style={{ fontFamily: "var(--font-display)" }} className="text-5xl md:text-6xl italic text-center mb-16">Meet the Practitioners</h2>
+        <div className="grid md:grid-cols-3 gap-10 max-w-5xl w-full">
+          {[
+            { name: "Mireille", role: "Lead Peeler", bio: "Twenty-two years with us. Has never aged. Smells faintly of lilac." },
+            { name: "Otto", role: "Loosening Specialist", bio: "Trained in Vienna, then somewhere colder. Speaks softly. Hums while he works." },
+            { name: "The Other One", role: "Apprentice", bio: "We do not ask her name. She prefers it that way. The clients adore her." },
+          ].map((p) => (
+            <div key={p.name} className="text-center">
+              <div className="w-32 h-32 mx-auto mb-4 rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, #f3d9c8, #c89a7e)" }} />
+              <h3 style={{ fontFamily: "var(--font-display)", color: "#5a3322" }} className="text-2xl italic">{p.name}</h3>
+              <p className="text-xs tracking-widest mb-3 opacity-70" style={{ color: "#a8745a" }}>{p.role.toUpperCase()}</p>
+              <p className="text-sm opacity-80" style={{ color: "#5a3322" }}>{p.bio}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* SECTION 3.94 — AMENITIES */}
+      <section className="min-h-screen flex flex-col items-center justify-center px-6 py-24">
+        <h2 style={{ fontFamily: "var(--font-display)" }} className="text-5xl italic text-center mb-4">Little Comforts</h2>
+        <p className="opacity-70 mb-16 text-center max-w-md">Every detail considered. Every door, locked from the outside — for your safety.</p>
+        <div className="grid md:grid-cols-2 gap-6 max-w-3xl w-full">
+          {[
+            "Heated stone floors",
+            "Single-origin chamomile",
+            "Hand-stitched linen robes",
+            "Soundproofed treatment rooms",
+            "Private garden (do not enter)",
+            "Complimentary aftercare salve",
+          ].map((a, i) => (
+            <div key={i} className="flex items-center gap-4 p-5 rounded-2xl" style={{ background: "rgba(255,255,255,0.4)", border: "1px solid rgba(168,116,90,0.15)" }}>
+              <span style={{ color: "#a8745a" }} className="text-xl">✦</span>
+              <span style={{ color: "#5a3322" }}>{a}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* SECTION 3.96 — A LETTER FROM A CLIENT */}
+      <section className="min-h-screen flex flex-col items-center justify-center px-6 py-24">
+        <p className="tracking-[0.4em] text-xs uppercase mb-6 opacity-70" style={{ color: "#a8745a" }}>received last tuesday</p>
+        <h2 style={{ fontFamily: "var(--font-display)" }} className="text-4xl md:text-5xl italic text-center mb-12 max-w-2xl">A Letter, Unsigned</h2>
+        <div className="max-w-xl space-y-5 text-lg leading-relaxed italic" style={{ color: "#5a3322", fontFamily: "var(--font-display)" }}>
+          <p>Dearest Petal &amp; Peel,</p>
+          <p>I do not recognize my reflection anymore, and I want to thank you.</p>
+          <p>The new layer fits beautifully. It moves when I am still. It smiles when I am not.</p>
+          <p>I will see you again on the seventh. Or perhaps you will see me first.</p>
+          <p className="not-italic text-sm tracking-widest opacity-60" style={{ fontFamily: "var(--font-body)" }}>— a friend</p>
+        </div>
+      </section>
+
+      {/* SECTION 3.98 — BOOKING (cozy, the moment of commitment) */}
+      <section className="min-h-screen flex flex-col items-center justify-center px-6 py-24">
+        <h2 style={{ fontFamily: "var(--font-display)" }} className="text-5xl italic text-center mb-6">Reserve Your Layer</h2>
+        <p className="opacity-70 mb-12 text-center max-w-md">We have one opening. It has your name on it. It always did.</p>
+        <div className="max-w-md w-full space-y-4 p-8 rounded-3xl" style={{ background: "rgba(255,255,255,0.5)", border: "1px solid rgba(168,116,90,0.2)" }}>
+          <div>
+            <label className="text-xs tracking-widest uppercase opacity-70" style={{ color: "#a8745a" }}>Your Name</label>
+            <div className="mt-1 px-4 py-3 rounded-xl text-base" style={{ background: "rgba(255,255,255,0.7)", color: "#5a3322" }}>(we already have it)</div>
+          </div>
+          <div>
+            <label className="text-xs tracking-widest uppercase opacity-70" style={{ color: "#a8745a" }}>Preferred Date</label>
+            <div className="mt-1 px-4 py-3 rounded-xl text-base" style={{ background: "rgba(255,255,255,0.7)", color: "#5a3322" }}>tonight</div>
+          </div>
+          <div>
+            <label className="text-xs tracking-widest uppercase opacity-70" style={{ color: "#a8745a" }}>Layer to Surrender</label>
+            <div className="mt-1 px-4 py-3 rounded-xl text-base" style={{ background: "rgba(255,255,255,0.7)", color: "#5a3322" }}>all of it</div>
+          </div>
+          <button className="w-full mt-4 py-4 rounded-xl text-sm tracking-[0.3em] uppercase" style={{ background: "#5a3322", color: "#f8ede4" }}>
+            Confirm Appointment
+          </button>
+          <p className="text-xs text-center opacity-60 italic" style={{ color: "#5a3322" }}>by clicking, you have already arrived.</p>
         </div>
       </section>
 
