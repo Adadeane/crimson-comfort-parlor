@@ -32,10 +32,14 @@ export const Route = createRootRoute({
       { title: "Petal & Peel — A Cozy Skin Ripping Parlor" },
       { name: "description", content: "Welcome to Petal & Peel. Soothing rituals. Eternal renewal. Leave your skin with us." },
       { property: "og:title", content: "Petal & Peel — A Cozy Skin Ripping Parlor" },
-      { property: "og:description", content: "Soothing rituals. Eternal renewal." },
+      { property: "og:description", content: "Welcome to Petal & Peel. Soothing rituals. Eternal renewal. Leave your skin with us." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Petal & Peel — A Cozy Skin Ripping Parlor" },
+      { name: "twitter:description", content: "Welcome to Petal & Peel. Soothing rituals. Eternal renewal. Leave your skin with us." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/c832bda4-8386-4262-93de-3d312bff8cab/id-preview-f09429fa--89cc332b-6ac4-4ded-85eb-283d4bace7c3.lovable.app-1777477481524.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/c832bda4-8386-4262-93de-3d312bff8cab/id-preview-f09429fa--89cc332b-6ac4-4ded-85eb-283d4bace7c3.lovable.app-1777477481524.png" },
     ],
     links: [
       {
