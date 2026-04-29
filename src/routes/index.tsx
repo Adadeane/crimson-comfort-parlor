@@ -13,28 +13,28 @@ export const Route = createFileRoute("/")({
 function Index() {
   const [progress, setProgress] = useState(0);
   const [audioOn, setAudioOn] = useState(true);
+  const [hasGesture, setHasGesture] = useState(false);
   const audioRef = useRef<AudioContext | null>(null);
   const oscRefs = useRef<{ stop: () => void }[]>([]);
 
   // Browsers block autoplay until the user interacts. Try to resume immediately;
   // if blocked, resume on the first user gesture so audio is effectively "on by default".
   useEffect(() => {
-    const resume = () => {
-      const ctx = audioRef.current;
-      if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
-    };
     const onGesture = () => {
-      resume();
+      setHasGesture(true);
       window.removeEventListener("pointerdown", onGesture);
       window.removeEventListener("keydown", onGesture);
+      window.removeEventListener("touchstart", onGesture);
       window.removeEventListener("scroll", onGesture);
     };
-    window.addEventListener("pointerdown", onGesture, { once: false });
-    window.addEventListener("keydown", onGesture, { once: false });
-    window.addEventListener("scroll", onGesture, { once: false, passive: true });
+    window.addEventListener("pointerdown", onGesture);
+    window.addEventListener("keydown", onGesture);
+    window.addEventListener("touchstart", onGesture);
+    window.addEventListener("scroll", onGesture, { passive: true });
     return () => {
       window.removeEventListener("pointerdown", onGesture);
       window.removeEventListener("keydown", onGesture);
+      window.removeEventListener("touchstart", onGesture);
       window.removeEventListener("scroll", onGesture);
     };
   }, []);
@@ -51,10 +51,11 @@ function Index() {
 
   // Procedural horror audio that intensifies with scroll
   useEffect(() => {
-    if (!audioOn) return;
+    if (!audioOn || !hasGesture) return;
     const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ctx = new Ctx();
     audioRef.current = ctx;
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
 
     const master = ctx.createGain();
     master.gain.value = 0.5;
@@ -225,7 +226,7 @@ function Index() {
       cancelAnimationFrame(raf);
       oscRefs.current.forEach(o => o.stop());
     };
-  }, [audioOn]);
+  }, [audioOn, hasGesture]);
 
   // Color interpolation
   const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
